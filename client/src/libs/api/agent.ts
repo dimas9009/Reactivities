@@ -1,5 +1,7 @@
 import axios from "axios";
 import { store } from "../stores/store";
+import { toast } from "react-toastify";
+import { router } from "../../app/router/Router";
 
 const sleep = (delay: number) => {
     return new Promise(resolve => {
@@ -17,15 +19,43 @@ agent.interceptors.request.use(config => {
 })
 
 agent.interceptors.response.use(async response => {
-    try {
-        await sleep(1000);
-        return response;
-    } catch (error) {
-        console.log(error);
-        return Promise.reject(error);
-    } finally {
-        store.uiStore.isIdle();
+    await sleep(1000);
+    store.uiStore.isIdle();
+    return response;
+},
+async error => {
+    await sleep(1000);
+    store.uiStore.isIdle();
+
+    const {status, data } = error.response;
+    switch(status) {
+        case 400:
+            if (data.error) {
+                const modalStateErrors = [];
+                for (const key in data.errors)
+                    if (data.errors[key]) {
+                        modalStateErrors.push(data.error[key]);
+                    }
+                    throw modalStateErrors.flat();
+            } else {
+                toast.error(data);
+            }
+            break;
+        case 401:
+            toast.error('Unauthorised')
+            break;
+        case 404:
+            router.navigate('/not-found')
+            break;
+        case 500:
+            toast.error('Server error');
+            break;
+        default:
+            break;
     }
-})
+
+    return Promise.reject(error);
+}
+)
 
 export default agent;
